@@ -41,7 +41,7 @@ function aiClass(a) {
 }
 const chips = (list) => (list && list.length ? `<div class="chips">${list.map((a) => `<span class="chip ${aiClass(a)}">${esc(a)}</span>`).join('')}</div>` : DASH);
 function pill(st) {
-  const m = { 'in-funzione': ['ok', 'In funzione'], dichiarato: ['', 'Scritto a mano'], citato: ['warn', 'Non trovato'], 'da-autorizzare': ['warn', 'Da autorizzare'], disattivato: ['', 'Disattivato'], assente: ['', 'Non installato'], 'piano-ignoto': ['', 'Piano non rilevato'], 'senza-piano': ['', 'Senza abbonamento'] }[st];
+  const m = { 'in-funzione': ['ok', 'In funzione'], dichiarato: ['', 'Scritto a mano'], indicato: ['', 'Indicato da te'], citato: ['warn', 'Non trovato'], 'da-autorizzare': ['warn', 'Da autorizzare'], disattivato: ['', 'Disattivato'], assente: ['', 'Non installato'], 'piano-ignoto': ['', 'Piano non rilevato'], 'senza-piano': ['', 'Senza abbonamento'] }[st];
   return m ? `<span class="pill ${m[0]}">${m[1]}</span>` : '';
 }
 const items = (cat) => D.items.filter((i) => i.cat === cat);
@@ -177,7 +177,7 @@ const views = {
   panoramica: overview,
   abbonamenti() {
     const rows = items('abbonamento');
-    return listView({ key: 'abbonamenti', title: 'Abbonamenti', noun: 'abbonamenti', lede: 'Gli LLM che usi da remoto. Claude si legge dai file del PC, quello scritto a mano sta in dichiarato.json.', rows, cols: [
+    return listView({ key: 'abbonamenti', title: 'Abbonamenti', noun: 'abbonamenti', lede: 'Gli LLM che usi da remoto. Claude e Codex si leggono dai file del PC, il piano Google lo indichi tu.', before: '<div class="section-actions"><button class="btn btn-ghost" data-act="google">Cambia piano Google</button></div>', rows, cols: [
       { h: 'Abbonamento', cell: (r) => nameCell(r, sub(r.group, r.description)) },
       { h: 'Modelli disponibili', cell: (r) => chips(r.models) },
       { h: 'Attivo dal', phone: false, cell: (r) => day(r.since) },
@@ -333,6 +333,7 @@ async function poll() {
     const s = await (await fetch('/api/ping')).json();
     const changed = s.generation !== status.generation;
     status = s;
+    maybeAskGoogle();
     if (changed || (D === null && !s.running)) await loadData(); else updateTitleActions();
     if (!D && s.running) render(true);
   } catch { /* il server si riavvia con l'icona sul Desktop */ }
@@ -346,12 +347,65 @@ async function startScan(force) {
 let toastTimer;
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 1600); }
 
+// ---------- Domanda sul piano Google ----------
+let googleAsked = false;
+function maybeAskGoogle() {
+  if (!status.askGoogle || googleAsked) return;
+  googleAsked = true;
+  openGooglePlan().catch(() => {});
+}
+async function openGooglePlan() {
+  const info = await (await fetch('/api/piani-google')).json();
+  const now = info.risposta || {};
+  const opt = (value, name, price = '') => `<label class="opt"><input type="radio" name="plan" value="${esc(value)}" ${now.scelta === value ? 'checked' : ''}><span>${esc(name)}</span>${price ? `<span class="price">${esc(price)}</span>` : ''}</label>`;
+  const d = $('#gplan');
+  d.innerHTML = `<form id="gplan-form" novalidate>
+    <h2 id="gplan-title">Hai un piano in abbonamento Google?</h2>
+    <p class="dlg-lede">Vale per Antigravity, Gemini e le app AI di Google. Il computer non lo può sapere da solo, e la risposta resta qui.</p>
+    <fieldset class="opts"><legend class="sr">Scegli il tuo piano Google</legend>
+      ${opt('nessuno', 'No, nessun piano')}
+      ${info.piani.map((p) => opt(p.id, p.nome, p.prezzo)).join('')}
+      ${opt('altro', 'Altro piano, aziendale o personalizzato')}
+    </fieldset>
+    <div class="dlg-fields" id="gplan-altro" hidden>
+      <label class="field"><span>Nome del piano</span><input id="gplan-nome" maxlength="80" autocomplete="off" value="${esc(now.scelta === 'altro' ? now.nome || '' : '')}"></label>
+      <label class="field"><span>Costo, se vuoi indicarlo</span><input id="gplan-prezzo" maxlength="40" autocomplete="off" value="${esc(now.scelta === 'altro' ? now.prezzo || '' : '')}"></label>
+    </div>
+    <p class="dlg-note">Prezzi di listino in Italia, controllati ${esc(info.verificato)} sul sito di Google.</p>
+    <div class="dlg-actions"><span class="err" id="gplan-err" role="alert"></span><button type="button" class="btn btn-ghost" data-act="google-close">Più tardi</button><button type="submit" class="btn btn-primary" id="gplan-save">Salva</button></div>
+  </form>`;
+  syncGooglePlan();
+  if (!d.open) d.showModal();
+}
+function syncGooglePlan() {
+  const choice = document.querySelector('#gplan input[name="plan"]:checked')?.value;
+  const other = choice === 'altro';
+  $('#gplan-altro').hidden = !other;
+  $('#gplan-save').disabled = !choice || (other && !$('#gplan-nome').value.trim());
+}
+async function saveGooglePlan() {
+  const scelta = document.querySelector('#gplan input[name="plan"]:checked')?.value;
+  const body = { scelta, nome: $('#gplan-nome').value, prezzo: $('#gplan-prezzo').value };
+  const res = await fetch('/api/piano-google', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => null);
+  if (!res?.ok) { $('#gplan-err').textContent = 'Salvataggio non riuscito, riprova.'; return; }
+  status = await res.json();
+  $('#gplan').close();
+  toast('Piano salvato');
+  updateTitleActions();
+  setTimeout(poll, 400);
+}
+$('#gplan').addEventListener('change', syncGooglePlan);
+$('#gplan').addEventListener('input', syncGooglePlan);
+$('#gplan').addEventListener('submit', (e) => { e.preventDefault(); if (!$('#gplan-save').disabled) saveGooglePlan(); });
+
 // ---------- Interazioni ----------
 document.addEventListener('click', async (e) => {
   const t = e.target.closest('[data-act],[data-toggle],[data-tab],[data-copy],[data-open]');
   if (!t) return;
   if (t.dataset.act === 'scan') { await startScan(true); setTimeout(poll, 400); }
   if (t.dataset.act === 'reload') loadData();
+  if (t.dataset.act === 'google') openGooglePlan().catch(() => toast('Non riesco ad aprire la domanda'));
+  if (t.dataset.act === 'google-close') $('#gplan').close();
   if (t.dataset.toggle) { const id = t.dataset.toggle; ui.open.has(id) ? ui.open.delete(id) : ui.open.add(id); render(true); document.querySelector(`[data-toggle="${CSS.escape(id)}"]`)?.focus(); }
   if (t.dataset.tab) { const [k, id] = t.dataset.tab.split('|'); ui.tabs[k] = id; render(true); }
   if (t.dataset.copy) { await navigator.clipboard.writeText(t.dataset.copy); toast('Percorso copiato'); }
@@ -379,7 +433,7 @@ $('#menu').addEventListener('click', () => { const o = $('#side').classList.togg
 
 (async function start() {
   render();
-  try { status = await (await fetch('/api/ping')).json(); await loadData(); } catch {}
+  try { status = await (await fetch('/api/ping')).json(); maybeAskGoogle(); await loadData(); } catch {}
   await startScan(false).catch(() => {});
   setTimeout(poll, 800);
 })();

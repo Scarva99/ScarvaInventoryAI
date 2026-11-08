@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HOME, LOCAL, ROAMING, MAC, WIN, ps, run, sh, whichCmd, readJson, readText, listDir, subdirs, norm, uniq, baseName, makeLabeler } from './util.mjs';
 import { buildModels, extractMentions, matchMention, KINDS } from './models.mjs';
+import { googlePlan } from './google-plans.mjs';
 import { collectTools, buildSkills, collectPlugins, collectMcp, buildPython, buildNodeLibs, buildEngines, buildAgents, buildPrograms, buildSubscriptions, comfyRoot } from './sources.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -135,9 +136,11 @@ export async function runScan(onPhase = () => {}) {
   const programs = buildPrograms(sys);
   const subs = buildSubscriptions(claudeJson, declared);
   // Le app comprese in un piano lo dicono anche sulla propria riga.
-  for (const a of declared.abbonamenti || []) {
-    if (!a.appIncluse) continue;
-    const included = new RegExp(a.appIncluse, 'i');
+  const google = googlePlan(declared);
+  for (const a of [...(declared.abbonamenti || []), ...(google ? [{ nome: google.nome, fornitore: 'Google' }] : [])]) {
+    // Un piano Google AI copre tutte le app Google con AI. Gemini Nano in Chrome e' un modello locale e resta fuori.
+    const included = a.appIncluse ? new RegExp(a.appIncluse, 'i') : /google/i.test(`${a.fornitore} ${a.nome}`) ? /antigravity|gemini(?! nano)/i : null;
+    if (!included) continue;
     for (const x of agents) if (included.test(x.name)) x.description = [x.description, `Compreso in ${a.nome}.`].filter(Boolean).join(' ');
   }
 

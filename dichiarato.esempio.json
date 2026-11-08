@@ -4,8 +4,7 @@
     "nome": "Nome del piano",
     "fornitore": "Azienda",
     "nota": "Una riga di spiegazione.",
-    "modelli": ["Cosa comprende"],
-    "appIncluse": "^antigravity"
+    "modelli": ["Cosa comprende"]
   },
   "abbonamenti": [],
   "senzaAbbonamento": [],

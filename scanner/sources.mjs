@@ -1,5 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
+import { googlePlan } from './google-plans.mjs';
 import { HOME, LOCAL, ROAMING, WIN, MAC, readText, readJson, exists, isDir, listDir, subdirs, sh, whichCmd, run, pool, slug, norm, uniq, versionOf, compareVersions, isProjectPath } from './util.mjs';
 
 const j = (...p) => path.join(...p);
@@ -453,6 +454,27 @@ export function buildPrograms(sys) {
   }));
 }
 
+// Il piano di Codex sta nelle sue sessioni: auth.json non viene mai aperto.
+const CODEX_PLANS = { go: 'ChatGPT Go', plus: 'ChatGPT Plus', pro: 'ChatGPT Pro', team: 'ChatGPT Team', business: 'ChatGPT Business', enterprise: 'ChatGPT Enterprise', edu: 'ChatGPT Edu' };
+
+function codexPlan() {
+  const files = [];
+  const walk = (d) => {
+    for (const e of listDir(d)) {
+      const p = j(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.name.endsWith('.jsonl')) { try { files.push({ p, m: fs.statSync(p).mtimeMs }); } catch {} }
+    }
+  };
+  walk(j(HOME, '.codex', 'sessions'));
+  walk(j(HOME, '.codex', 'archived_sessions'));
+  for (const f of files.sort((a, b) => b.m - a.m).slice(0, 300)) {
+    const found = (readText(f.p, 200_000_000) || '').match(/"plan_type":"\w+"/g);
+    if (found) return { plan: found.at(-1).slice(13, -1), seen: f.m };
+  }
+  return null;
+}
+
 export function buildSubscriptions(claudeJson, declared) {
   const out = [];
   const oa = claudeJson?.oauthAccount;
@@ -461,11 +483,19 @@ export function buildSubscriptions(claudeJson, declared) {
     const name = oa.organizationType === 'claude_max' ? `Claude Max${tier ? ` ${tier[1]}x` : ''}` : oa.organizationType.replace('claude_', 'Claude ');
     out.push({ id: 'abbonamento:claude', cat: 'abbonamento', name, group: 'Anthropic', status: 'rilevato', since: oa.subscriptionCreatedAt, models: declared.modelliInAbbonamento?.Claude || [], description: oa.hasExtraUsageEnabled ? 'Utilizzo extra attivo.' : '' });
   }
+  const google = googlePlan(declared);
+  if (google) out.push({ id: `abbonamento:${slug(google.nome)}`, cat: 'abbonamento', name: google.nome, group: 'Google', status: 'indicato', models: ['Antigravity', 'Gemini', 'Google'], description: [google.prezzo, 'Copre Antigravity, Gemini e le app AI di Google.'].filter(Boolean).join('. ') });
   for (const a of declared.abbonamenti || []) out.push({ id: `abbonamento:${slug(a.nome)}`, cat: 'abbonamento', name: a.nome, group: a.fornitore, status: 'dichiarato', models: a.modelli || [], description: a.nota });
   const codex = readJson(j(HOME, '.codex', 'models_cache.json'));
   if (codex?.models) {
-    const free = (declared.senzaAbbonamento || []).includes('Codex');
-    out.push({ id: 'abbonamento:codex', cat: 'abbonamento', name: 'Codex (OpenAI)', group: 'OpenAI', status: free ? 'senza-piano' : 'piano-ignoto', models: codex.models.map((m) => m.slug).filter((s) => s && !/auto-review|reserve/.test(s)), description: free ? 'Account collegato sul PC, nessun abbonamento a pagamento.' : 'Account collegato sul PC. Il piano non si legge dai file locali.' });
+    const seen = codexPlan();
+    const paid = seen && seen.plan !== 'free' ? CODEX_PLANS[seen.plan] || `ChatGPT ${seen.plan}` : null;
+    const date = seen ? new Date(seen.seen).toLocaleDateString('it-IT') : '';
+    const free = seen ? !paid : (declared.senzaAbbonamento || []).includes('Codex');
+    const description = seen
+      ? `${paid ? `Piano ${paid}` : 'Account gratuito'}, letto dalle sessioni di Codex. Ultimo dato disponibile: ${date}.`
+      : free ? 'Account collegato sul PC, nessun abbonamento a pagamento.' : 'Account collegato sul PC. Nessuna sessione riporta ancora il piano.';
+    out.push({ id: 'abbonamento:codex', cat: 'abbonamento', name: paid ? `Codex (${paid})` : 'Codex (OpenAI)', group: 'OpenAI', status: paid ? 'rilevato' : free ? 'senza-piano' : 'piano-ignoto', models: codex.models.map((m) => m.slug).filter((s) => s && !/auto-review|reserve/.test(s)), description });
   }
   return out;
 }

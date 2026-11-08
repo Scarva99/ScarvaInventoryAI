@@ -32,6 +32,7 @@
   --ai-vscode: #dcf1f8; --ai-vscode-ink: #0c4a5f;
   --ai-comfy: #fbf1cf; --ai-comfy-ink: #5c4503;
   --ai-other: #ebedee; --ai-other-ink: #353736;
+  --scrim: rgba(19, 20, 22, .36);
   --radius-card: 8px; --radius-control: 6px; --radius-sheet: 16px;
   --sheet-inset: 8px; --row-height: 48px; --sidebar-width: 228px;
   --gap: 24px; --pad: 24px; --control-height: 32px;
@@ -174,6 +175,29 @@ tr.row td { transition: background-color .12s ease-out; }
 .toast { position: fixed; left: 50%; bottom: 20px; transform: translate(-50%, 8px); background: var(--primary); color: var(--primary-ink); padding: 6px 12px; border-radius: var(--radius-control); font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .15s ease-out, transform .15s ease-out; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
 .toast.on { opacity: 1; transform: translate(-50%, 0); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* Domanda sul piano Google */
+.dlg { width: min(480px, calc(100% - 32px)); max-height: calc(100% - 32px); padding: var(--pad); background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sheet); }
+.dlg::backdrop { background: var(--scrim); }
+.dlg h2 { font-size: var(--fs-title); line-height: 28px; font-weight: 600; letter-spacing: -0.01em; }
+.dlg-lede { color: var(--muted); margin: 4px 0 16px; }
+.opts { border: 0; padding: 0; margin: 0; }
+.opt { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 4px; cursor: pointer; }
+.opt + .opt { border-top: 1px solid var(--rule); }
+.opt input { flex: none; width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.opt span:first-of-type { flex: 1; min-width: 0; }
+.opt .price { color: var(--muted); white-space: nowrap; }
+.opt:has(input:checked) span:first-of-type { font-weight: 500; }
+.dlg-fields { display: grid; gap: 10px; padding: 10px 4px 2px; }
+.dlg-fields[hidden] { display: none; }
+.field { display: grid; gap: 4px; }
+.field span { font-size: 13px; color: var(--muted); }
+.field input { width: 100%; height: var(--control-height); padding: 0 10px; border: 1px solid var(--control); border-radius: var(--radius-control); font: inherit; background: var(--surface); color: var(--text); }
+.dlg-note { color: var(--muted); font-size: var(--fs-small); line-height: 16px; margin-top: 12px; }
+.dlg-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.dlg-actions .err { margin-right: auto; font-size: 13px; }
+.dlg-actions .btn-ghost { height: var(--control-height); padding: 0 12px; font-size: var(--fs-body); }
+.section-actions { margin-bottom: 12px; }
 
 @media (max-width: 1250px) {
   .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }

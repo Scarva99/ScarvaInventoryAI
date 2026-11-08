@@ -28,7 +28,7 @@ Intanto i modelli occupano decine di gigabyte in cartelle nascoste, e ogni AI ti
 | **Skill** | Quali hai e per quale AI sono installate |
 | **Plugin** | Per Claude Code, Codex, Antigravity, VS Code, ComfyUI e Obsidian |
 | **MCP e connettori** | Quali sono collegati e quali aspettano un'autorizzazione |
-| **Abbonamenti** | Claude Max viene rilevato da solo, gli altri piani li scrivi tu una volta |
+| **Abbonamenti** | Claude e Codex vengono rilevati da soli, il piano Google te lo chiede una volta alla prima apertura |
 | **Linguaggi e strumenti** | Node, Python, Java, Git, FFmpeg e il resto, con la versione |
 | **Progetti** | Incrocia le memorie di Claude con il disco e ti segnala i modelli citati che non si trovano più |
 | **Hardware** | Scheda video, memoria, dischi, porte AI in ascolto |
@@ -74,7 +74,7 @@ Per aggiornare il programma: `git pull` nella cartella.
 
 ## Personalizzazione
 
-- **`dichiarato.json`** contiene ciò che il computer non può rilevare, come gli abbonamenti diversi da Claude. Viene creato alla prima scansione a partire da `dichiarato.esempio.json` e resta solo sul tuo computer.
+- **`dichiarato.json`** contiene ciò che il computer non può rilevare, come la risposta sul piano Google, che puoi cambiare dalla sezione Abbonamenti. Viene creato alla prima scansione a partire da `dichiarato.esempio.json` e resta solo sul tuo computer.
 - **`scanner/models.mjs`**, nell'elenco `RULES`, contiene i nomi dei modelli noti. Un modello che non corrisponde a nessuna regola compare comunque, col nome del file.
 
 ## Limiti della scansione

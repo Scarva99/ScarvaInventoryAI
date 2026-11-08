@@ -5,6 +5,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { runScan } from './scanner/scan.mjs';
+import { GOOGLE_PLANS } from './scanner/google-plans.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -18,8 +19,44 @@ const MAC = process.platform === 'darwin';
 const detach = (cmd, args) => spawn(cmd, args, { windowsHide: true, detached: true, stdio: 'ignore' }).unref();
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.woff2': 'font/woff2', '.svg': 'image/svg+xml' };
-const status = { running: false, phase: '', generation: 0, startedAt: null, finishedAt: null, error: null };
+const status = { running: false, phase: '', generation: 0, startedAt: null, finishedAt: null, error: null, askGoogle: false };
 let lastPing = Date.now();
+let scanAgain = false;
+
+// ---------- Risposta alla domanda sul piano Google, salvata in dichiarato.json ----------
+const DECLARED = path.join(ROOT, 'dichiarato.json');
+const isGoogle = (a) => /google/i.test(`${a.fornitore} ${a.nome}`);
+const parseJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, ''));
+
+// null vuol dire che il file esiste ma e' illeggibile: in quel caso non va sovrascritto.
+function readDeclared() {
+  try { return parseJson(fs.existsSync(DECLARED) ? DECLARED : path.join(ROOT, 'dichiarato.esempio.json')); }
+  catch { return fs.existsSync(DECLARED) ? null : {}; }
+}
+
+function currentGoogleAnswer() {
+  const d = readDeclared() || {};
+  if (d.pianoGoogle) return d.pianoGoogle;
+  const legacy = (d.abbonamenti || []).find(isGoogle);
+  const known = legacy && GOOGLE_PLANS.piani.find((p) => p.nome === legacy.nome);
+  return known ? { scelta: known.id } : legacy ? { scelta: 'altro', nome: legacy.nome } : null;
+}
+
+function saveGoogleAnswer(body) {
+  const clean = (v, max) => String(v ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max);
+  const scelta = String(body.scelta || '');
+  const valid = scelta === 'nessuno' || scelta === 'altro' || GOOGLE_PLANS.piani.some((p) => p.id === scelta);
+  const nome = clean(body.nome, 80);
+  if (!valid || (scelta === 'altro' && !nome)) return false;
+  const d = readDeclared();
+  if (!d) return false;
+  d.pianoGoogle = scelta === 'altro' ? { scelta, nome, prezzo: clean(body.prezzo, 40) } : { scelta };
+  d.abbonamenti = (d.abbonamenti || []).filter((a) => !isGoogle(a));
+  const tmp = `${DECLARED}.tmp`;
+  fs.writeFileSync(tmp, `${JSON.stringify(d, null, 2)}\n`, 'utf8');
+  fs.renameSync(tmp, DECLARED);
+  return true;
+}
 
 async function scan() {
   if (status.running) return;
@@ -31,6 +68,7 @@ async function scan() {
     status.error = String(e?.message || e);
   } finally {
     Object.assign(status, { running: false, phase: '', finishedAt: Date.now() });
+    if (scanAgain) { scanAgain = false; scan(); }
   }
 }
 
@@ -70,6 +108,13 @@ const server = http.createServer(async (req, res) => {
       if (!status.running && (body.force || !fresh)) scan();
       return send(res, 200, JSON.stringify(status));
     }
+    if (url.pathname === '/api/piano-google') {
+      if (!saveGoogleAnswer(await readBody(req))) return send(res, 400, '{}');
+      status.askGoogle = false;
+      // Una scansione in corso potrebbe aver gia' letto il file: ne serve un'altra subito dopo.
+      if (status.running) scanAgain = true; else scan();
+      return send(res, 200, JSON.stringify(status));
+    }
     if (url.pathname === '/api/open') {
       const { path: p } = await readBody(req);
       if (typeof p !== 'string' || !knownPaths().has(p.toLowerCase()) || !fs.existsSync(p)) return send(res, 404, '{}');
@@ -81,6 +126,7 @@ const server = http.createServer(async (req, res) => {
     return send(res, 404, '{}');
   }
   if (url.pathname === '/api/ping') { lastPing = Date.now(); return send(res, 200, JSON.stringify(status)); }
+  if (url.pathname === '/api/piani-google') return send(res, 200, JSON.stringify({ ...GOOGLE_PLANS, risposta: currentGoogleAnswer() }));
   if (url.pathname === '/api/inventory') {
     if (!fs.existsSync(LATEST)) return send(res, 200, 'null');
     return send(res, 200, fs.readFileSync(LATEST));
@@ -99,6 +145,7 @@ server.on('error', (e) => {
 });
 server.listen(PORT, HOST, () => {
   console.log(`Inventario AI su ${ORIGIN}`);
+  status.askGoogle = !readDeclared()?.pianoGoogle;
   if (openBrowser) launchBrowser();
   scan();
   if (!keepAlive) setInterval(() => { if (!status.running && Date.now() - lastPing > 90000) process.exit(0); }, 15000);
