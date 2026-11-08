@@ -7,7 +7,7 @@ Pagina locale con tutto ciò che riguarda l'AI e lo sviluppo sul computer su cui
 Serve [Node](https://nodejs.org) 22 o più recente. Funziona su Windows e macOS, senza altre dipendenze.
 
 ```
-git clone <indirizzo della repo>
+git clone https://github.com/Scarva99/ScarvaInventoryAI.git
 ```
 
 - **Windows:** doppio clic su `Avvia Inventario.vbs`.
