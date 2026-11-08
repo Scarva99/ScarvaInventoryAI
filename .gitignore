@@ -1,0 +1,13 @@
+# Inventario di ogni singolo computer: percorsi, progetti, programmi installati.
+data/
+
+# Dati scritti a mano per questo computer (il modello e' dichiarato.esempio.json).
+dichiarato.json
+
+# File di lavoro del design.
+.taste-skill/
+
+# File creati dal sistema.
+.DS_Store
+Thumbs.db
+*.tmp

@@ -1,0 +1,21 @@
+{
+  "_leggimi": "Modello di dichiarato.json. Alla prima scansione viene copiato in dichiarato.json, che resta solo su questo computer: li' scrivi cio' che il PC non puo' rilevare da solo.",
+  "_esempioAbbonamento": {
+    "nome": "Nome del piano",
+    "fornitore": "Azienda",
+    "nota": "Una riga di spiegazione.",
+    "modelli": ["Cosa comprende"],
+    "appIncluse": "^antigravity"
+  },
+  "abbonamenti": [],
+  "senzaAbbonamento": [],
+  "modelliInAbbonamento": {
+    "Claude": ["Claude Fable 5.1", "Claude Opus 5.5", "Claude Sonnet 5.5", "Claude Haiku 5.5"]
+  },
+  "connettoriAccount": [],
+  "skillIntegrate": [
+    "dataviz", "artifact-design", "artifact-diagramming", "artifact-capabilities", "update-config", "keybindings-help",
+    "code-review", "simplify", "fewer-permission-prompts", "loop", "schedule", "claude-api", "workflow-authoring",
+    "run", "plugin-authoring", "init", "security-review"
+  ]
+}
